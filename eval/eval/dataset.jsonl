@@ -1,0 +1,32 @@
+{"id": "t01", "query": "hi there", "expected_difficulty": "trivial", "keypoints": ["greets back appropriately"]}
+{"id": "t02", "query": "what is 2 + 2", "expected_difficulty": "trivial", "keypoints": ["answer is 4"]}
+{"id": "t03", "query": "what time zone is UTC", "expected_difficulty": "trivial", "keypoints": ["coordinated universal time", "reference time zone"]}
+{"id": "t04", "query": "what is 15% of 200", "expected_difficulty": "trivial", "keypoints": ["answer is 30"]}
+{"id": "t05", "query": "thanks, that's helpful", "expected_difficulty": "trivial", "keypoints": ["acknowledges thanks appropriately"]}
+{"id": "t06", "query": "how many days in a week", "expected_difficulty": "trivial", "keypoints": ["answer is 7"]}
+{"id": "t07", "query": "what's the square root of 81", "expected_difficulty": "trivial", "keypoints": ["answer is 9"]}
+{"id": "t08", "query": "hello", "expected_difficulty": "trivial", "keypoints": ["greets back appropriately"]}
+{"id": "t09", "query": "what is 100 divided by 4", "expected_difficulty": "trivial", "keypoints": ["answer is 25"]}
+{"id": "t10", "query": "good morning", "expected_difficulty": "trivial", "keypoints": ["greets back appropriately"]}
+
+{"id": "e01", "query": "what is the capital of Japan", "expected_difficulty": "easy", "keypoints": ["Tokyo"]}
+{"id": "e02", "query": "convert 10 miles to kilometers", "expected_difficulty": "easy", "keypoints": ["approximately 16.09 km"]}
+{"id": "e03", "query": "explain what a variable is in programming", "expected_difficulty": "easy", "keypoints": ["named storage location", "holds a value that can change"]}
+{"id": "e04", "query": "summarize the plot of Romeo and Juliet in two sentences", "expected_difficulty": "easy", "keypoints": ["two feuding families", "young lovers", "tragic ending"]}
+{"id": "e05", "query": "what does HTTP stand for", "expected_difficulty": "easy", "keypoints": ["HyperText Transfer Protocol"]}
+{"id": "e06", "query": "what is the difference between a list and an array", "expected_difficulty": "easy", "keypoints": ["mentions size flexibility or type constraints"]}
+{"id": "e07", "query": "translate 'good morning' to Spanish", "expected_difficulty": "easy", "keypoints": ["buenos dias"]}
+{"id": "e08", "query": "what is a REST API", "expected_difficulty": "easy", "keypoints": ["architectural style", "HTTP methods", "resources"]}
+{"id": "e09", "query": "what year did World War II end", "expected_difficulty": "easy", "keypoints": ["1945"]}
+{"id": "e10", "query": "explain what a hash map is", "expected_difficulty": "easy", "keypoints": ["key-value storage", "average O(1) lookup"]}
+
+{"id": "h01", "query": "design a fault-tolerant distributed cache eviction strategy for a multi-region deployment", "expected_difficulty": "hard", "keypoints": ["addresses consistency across regions", "mentions an eviction policy (LRU/LFU/TTL)", "addresses failure handling"]}
+{"id": "h02", "query": "compare the tradeoffs of microservices vs a monolith for a fintech system handling regulatory audits", "expected_difficulty": "hard", "keypoints": ["addresses operational complexity", "addresses auditability/compliance", "gives a reasoned recommendation, not just a list"]}
+{"id": "h03", "query": "explain the CAP theorem and how it applies to designing a payments database", "expected_difficulty": "hard", "keypoints": ["defines consistency, availability, partition tolerance", "applies tradeoff to payments specifically"]}
+{"id": "h04", "query": "walk through how you would debug a race condition in a multithreaded Java service that only appears under load", "expected_difficulty": "hard", "keypoints": ["mentions thread-safety tools (e.g. thread dumps, sanitizers)", "mentions reproducing under load", "gives a structured debugging approach"]}
+{"id": "h05", "query": "design a rate limiter for a public API that needs to support both per-user and global limits", "expected_difficulty": "hard", "keypoints": ["names an algorithm (token bucket/sliding window)", "addresses per-user vs global scoping", "addresses distributed state (e.g. Redis)"]}
+{"id": "h06", "query": "explain the tradeoffs between optimistic and pessimistic locking for a high-contention inventory system", "expected_difficulty": "hard", "keypoints": ["defines both approaches", "ties tradeoff to contention level", "gives a reasoned recommendation"]}
+{"id": "h07", "query": "how would you shard a Postgres database that's outgrowing a single instance", "expected_difficulty": "hard", "keypoints": ["names a sharding key strategy", "addresses cross-shard queries/joins", "addresses rebalancing"]}
+{"id": "h08", "query": "prove that binary search runs in O(log n) time", "expected_difficulty": "hard", "keypoints": ["shows the halving argument", "derives log n from repeated halving", "reasonably rigorous, not just a claim"]}
+{"id": "h09", "query": "design an idempotency mechanism for a payment API so retried requests don't double-charge", "expected_difficulty": "hard", "keypoints": ["mentions idempotency keys", "addresses storage/expiry of keys", "addresses concurrent retries"]}
+{"id": "h10", "query": "explain how you would migrate a production database schema with zero downtime", "expected_difficulty": "hard", "keypoints": ["mentions backward-compatible migration steps", "addresses dual-write or expand-contract pattern", "addresses rollback safety"]}

@@ -1,0 +1,32 @@
+server:
+  port: 8080
+
+spring:
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/llmcascade}
+    username: ${SPRING_DATASOURCE_USERNAME:gateway}
+    password: ${SPRING_DATASOURCE_PASSWORD:gateway}
+  jpa:
+    hibernate:
+      ddl-auto: none   # schema comes from db/init.sql â€” never let Hibernate own prod schema
+    show-sql: false
+
+ml-services:
+  url: ${ML_SERVICE_URL:http://localhost:8000}
+
+ollama:
+  url: ${OLLAMA_URL:http://localhost:11434}
+
+redis:
+  url: ${REDIS_URL:redis://localhost:6379}
+
+frontier:
+  api-key: ${FRONTIER_API_KEY:}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,metrics
+
+

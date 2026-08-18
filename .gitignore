@@ -1,0 +1,56 @@
+# Secrets & Environment variables
+.env
+.env.local
+.env.development
+.env.test
+.env.production
+*.key
+*.pem
+secrets.json
+
+# Java / Maven / Spring Boot
+target/
+*.jar
+*.war
+*.ear
+*.class
+.mvn/
+mvnw
+mvnw.cmd
+.springBeans
+dependency-reduced-pom.xml
+
+# Python / FastAPI
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.coverage
+htmlcov/
+venv/
+env/
+.venv/
+.python-version
+pip-log.txt
+
+# Docker Data / Volumes
+ollama-data/
+postgres-data/
+redis-data/
+
+# IDEs and Editors
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+*.sublime-project
+*.sublime-workspace
+
+# Logs and Evals
+eval/results.jsonl
+eval/scored_results.jsonl
+eval/*.log
+logs/
+*.log
+

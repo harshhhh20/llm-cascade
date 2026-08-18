@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gateway Console — Intelligent LLM Cascade</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #10151F;
+    --surface: #171D2B;
+    --surface-2: #1F2636;
+    --border: #2A3347;
+    --text: #E7EAF0;
+    --text-muted: #8892A6;
+    --amber: #F2A93B;   /* in transit / active */
+    --teal: #4FD1C5;    /* free / cached / rule-based */
+    --rose: #E85D75;    /* frontier / expensive */
+    --blue: #6C8EF5;    /* local model tier */
+    --mono: 'IBM Plex Mono', monospace;
+    --sans: 'Inter', sans-serif;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap { max-width: 880px; margin: 0 auto; padding: 40px 24px 80px; }
+
+  header { margin-bottom: 36px; }
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--amber);
+    margin: 0 0 8px;
+  }
+  h1 { font-size: 28px; font-weight: 700; margin: 0 0 8px; letter-spacing: -0.01em; }
+  .sub { color: var(--text-muted); font-size: 14px; line-height: 1.5; max-width: 60ch; }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 22px;
+    margin-bottom: 20px;
+  }
+  .card h2 {
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin: 0 0 16px;
+    font-weight: 500;
+  }
+
+  textarea {
+    width: 100%;
+    min-height: 72px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 14px;
+    padding: 12px 14px;
+    resize: vertical;
+  }
+  textarea:focus { outline: 2px solid var(--amber); outline-offset: 1px; }
+
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0 16px; }
+  .chip {
+    font-family: var(--mono);
+    font-size: 12px;
+    padding: 6px 10px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--surface-2);
+    color: var(--text-muted);
+    cursor: pointer;
+  }
+  .chip:hover { border-color: var(--amber); color: var(--text); }
+  .chip[data-tier="trivial"] { border-left: 3px solid var(--teal); }
+  .chip[data-tier="easy"] { border-left: 3px solid var(--blue); }
+  .chip[data-tier="hard"] { border-left: 3px solid var(--rose); }
+
+  .row { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+
+  .toggle { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-muted); font-family: var(--mono); }
+  .toggle input { accent-color: var(--amber); }
+
+  button.submit {
+    font-family: var(--mono);
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    background: var(--amber);
+    color: #10151F;
+    border: none;
+    border-radius: 7px;
+    padding: 10px 18px;
+    cursor: pointer;
+  }
+  button.submit:hover { filter: brightness(1.08); }
+  button.submit:disabled { opacity: 0.5; cursor: default; }
+
+  /* Route line — the signature element */
+  .route-line { position: relative; padding: 28px 0 8px; }
+  .track { position: relative; height: 3px; background: var(--border); border-radius: 2px; margin: 0 4%; }
+  .stops { display: flex; justify-content: space-between; margin: 0 0; position: relative; top: -3px; }
+  .stop { position: relative; width: 25%; text-align: center; }
+  .dot {
+    width: 14px; height: 14px; border-radius: 50%;
+    background: var(--surface-2); border: 2px solid var(--border);
+    margin: 0 auto 10px; transition: all 0.35s ease;
+  }
+  .stop-label { font-family: var(--mono); font-size: 11px; color: var(--text-muted); letter-spacing: 0.02em; }
+  .stop.active .dot { transform: scale(1.35); box-shadow: 0 0 0 6px rgba(242,169,59,0.15); }
+  .stop.active .stop-label { color: var(--text); font-weight: 600; }
+  .stop[data-key="cache"].active .dot { background: var(--teal); border-color: var(--teal); box-shadow: 0 0 0 6px rgba(79,209,197,0.15); }
+  .stop[data-key="rule"].active .dot { background: var(--teal); border-color: var(--teal); box-shadow: 0 0 0 6px rgba(79,209,197,0.15); }
+  .stop[data-key="local"].active .dot { background: var(--blue); border-color: var(--blue); box-shadow: 0 0 0 6px rgba(108,142,245,0.15); }
+  .stop[data-key="frontier"].active .dot { background: var(--rose); border-color: var(--rose); box-shadow: 0 0 0 6px rgba(232,93,117,0.15); }
+
+  /* Response ticket */
+  .ticket { display: none; }
+  .ticket.show { display: block; }
+  .answer { font-size: 15px; line-height: 1.6; margin: 0 0 16px; white-space: pre-wrap; }
+  .meta { display: flex; flex-wrap: wrap; gap: 10px 22px; font-family: var(--mono); font-size: 12px; color: var(--text-muted); border-top: 1px dashed var(--border); padding-top: 14px; }
+  .meta b { color: var(--text); font-weight: 600; }
+  .badge {
+    display: inline-block; font-family: var(--mono); font-size: 11px; font-weight: 600;
+    padding: 3px 9px; border-radius: 5px; letter-spacing: 0.02em;
+  }
+  .badge.cache, .badge.rule_based { background: rgba(79,209,197,0.15); color: var(--teal); }
+  .badge.local { background: rgba(108,142,245,0.15); color: var(--blue); }
+  .badge.frontier { background: rgba(232,93,117,0.15); color: var(--rose); }
+  .badge.rejected { background: rgba(232,93,117,0.25); color: var(--rose); }
+
+  /* Compare panel */
+  .compare { display: none; margin-top: 16px; }
+  .compare.show { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .compare-col { background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; padding: 14px; }
+  .compare-col h3 { font-family: var(--mono); font-size: 11px; text-transform: uppercase; color: var(--text-muted); margin: 0 0 8px; letter-spacing: 0.05em; }
+  .compare-col .num { font-family: var(--mono); font-size: 20px; font-weight: 600; }
+  .delta { font-family: var(--mono); font-size: 12px; color: var(--teal); margin-top: 4px; }
+
+  /* Stats */
+  .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 18px; }
+  .stat-box { background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; padding: 14px; }
+  .stat-box .label { font-family: var(--mono); font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; }
+  .stat-box .value { font-family: var(--mono); font-size: 22px; font-weight: 600; margin-top: 6px; }
+  .stat-box .value.saved { color: var(--teal); }
+
+  .bar-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; font-family: var(--mono); font-size: 12px; }
+  .bar-row .name { width: 220px; color: var(--text-muted); flex-shrink: 0; }
+  .bar-track { flex: 1; height: 8px; background: var(--surface-2); border-radius: 4px; overflow: hidden; }
+  .bar-fill { height: 100%; background: var(--amber); border-radius: 4px; }
+  .bar-row .count { width: 30px; text-align: right; color: var(--text-muted); }
+
+  /* History */
+  .hist-item {
+    display: flex; justify-content: space-between; gap: 12px;
+    padding: 10px 0; border-bottom: 1px solid var(--border);
+    font-size: 13px;
+  }
+  .hist-item:last-child { border-bottom: none; }
+  .hist-q { color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 60%; }
+  .hist-meta { font-family: var(--mono); font-size: 11px; color: var(--text-muted); display: flex; gap: 10px; align-items: center; }
+
+  .empty { color: var(--text-muted); font-size: 13px; font-style: italic; }
+  .refresh { font-family: var(--mono); font-size: 11px; color: var(--text-muted); background: none; border: 1px solid var(--border); border-radius: 6px; padding: 4px 10px; cursor: pointer; }
+  .refresh:hover { color: var(--text); border-color: var(--amber); }
+
+  @media (max-width: 560px) {
+    .stats-grid { grid-template-columns: 1fr 1fr; }
+    .compare.show { grid-template-columns: 1fr; }
+    .bar-row .name { width: 140px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <p class="eyebrow">Intelligent LLM Cascade</p>
+    <h1>Gateway Console</h1>
+    <p class="sub">Every query below is routed live — cached, rule-based, local model, or frontier API — based on measured complexity, not a fixed path. Watch where it lands.</p>
+  </header>
+
+  <div class="card">
+    <h2>Send a query</h2>
+    <textarea id="queryInput" placeholder="Ask something — try a greeting, a factual question, or a system design problem…"></textarea>
+    <div class="chips" id="chips"></div>
+    <div class="row">
+      <label class="toggle">
+        <input type="checkbox" id="compareToggle">
+        Compare against always-frontier baseline
+      </label>
+      <button class="submit" id="submitBtn">Send →</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Route</h2>
+    <div class="route-line">
+      <div class="track"></div>
+      <div class="stops">
+        <div class="stop" data-key="cache"><div class="dot"></div><div class="stop-label">Cache</div></div>
+        <div class="stop" data-key="rule"><div class="dot"></div><div class="stop-label">Rule-based</div></div>
+        <div class="stop" data-key="local"><div class="dot"></div><div class="stop-label">Local model</div></div>
+        <div class="stop" data-key="frontier"><div class="dot"></div><div class="stop-label">Frontier</div></div>
+      </div>
+    </div>
+
+    <div class="ticket" id="ticket">
+      <p class="answer" id="answerText"></p>
+      <div class="meta" id="metaRow"></div>
+    </div>
+    <p class="empty" id="emptyState">No query sent yet — try one of the examples above.</p>
+
+    <div class="compare" id="comparePanel">
+      <div class="compare-col">
+        <h3>Adaptive gateway</h3>
+        <div class="num" id="adaptiveCost">—</div>
+        <div class="delta" id="adaptiveLatency">—</div>
+      </div>
+      <div class="compare-col">
+        <h3>Always frontier</h3>
+        <div class="num" id="baselineCost">—</div>
+        <div class="delta" id="baselineLatency">—</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="row" style="margin-bottom: 16px;">
+      <h2 style="margin: 0;">Live stats</h2>
+      <button class="refresh" id="refreshStats">Refresh</button>
+    </div>
+    <div class="stats-grid">
+      <div class="stat-box"><div class="label">Total requests</div><div class="value" id="statTotal">—</div></div>
+      <div class="stat-box"><div class="label">Total cost</div><div class="value" id="statCost">—</div></div>
+      <div class="stat-box"><div class="label">Cost saved</div><div class="value saved" id="statSaved">—</div></div>
+    </div>
+    <div id="routeBars"><p class="empty">No logged requests yet.</p></div>
+  </div>
+
+  <div class="card">
+    <h2>This session</h2>
+    <div id="historyList"><p class="empty">Your queries this session will show up here.</p></div>
+  </div>
+
+</div>
+
+<script>
+const API = '';
+
+const EXAMPLES = [
+  { tier: 'trivial', label: 'hi there', query: 'hi there' },
+  { tier: 'trivial', label: '15% of 200', query: 'what is 15% of 200' },
+  { tier: 'easy', label: 'what is a REST API', query: 'what is a REST API' },
+  { tier: 'easy', label: 'explain a hash map', query: 'explain what a hash map is' },
+  { tier: 'hard', label: 'CAP theorem', query: 'explain the CAP theorem and how it applies to designing a payments database' },
+  { tier: 'hard', label: 'rate limiter design', query: 'design a rate limiter for a public API that needs to support both per-user and global limits' },
+];
+
+const ROUTE_TO_STOP = {
+  cache_hit: 'cache',
+  rule_based: 'rule',
+  rule_based_escalated_local: 'local',
+  rule_based_escalated_frontier: 'frontier',
+  local_model: 'local',
+  local_model_fallback_frontier: 'frontier',
+  frontier_model: 'frontier',
+  baseline_frontier: 'frontier',
+  rejected: null,
+};
+
+const ROUTE_BADGE_CLASS = {
+  cache_hit: 'cache', rule_based: 'rule_based', rule_based_escalated_local: 'local',
+  rule_based_escalated_frontier: 'frontier', local_model: 'local',
+  local_model_fallback_frontier: 'frontier', frontier_model: 'frontier',
+  baseline_frontier: 'frontier', rejected: 'rejected',
+};
+
+let history = [];
+
+function renderChips() {
+  const el = document.getElementById('chips');
+  el.innerHTML = EXAMPLES.map(e =>
+    `<span class="chip" data-tier="${e.tier}" data-query="${e.query.replace(/"/g, '&quot;')}">${e.label}</span>`
+  ).join('');
+  el.querySelectorAll('.chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      document.getElementById('queryInput').value = chip.dataset.query;
+    });
+  });
+}
+
+function setActiveStop(route) {
+  document.querySelectorAll('.stop').forEach(s => s.classList.remove('active'));
+  const key = ROUTE_TO_STOP[route];
+  if (key) {
+    const stop = document.querySelector(`.stop[data-key="${key}"]`);
+    if (stop) stop.classList.add('active');
+  }
+}
+
+function fmtCost(v) { return '$' + v.toFixed(5); }
+function fmtMs(v) { return v.toFixed(0) + 'ms'; }
+
+async function callGateway(query, forceFrontier) {
+  const resp = await fetch(`${API}/api/query`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ query, userId: 'ui-demo', forceFrontier }),
+  });
+  if (!resp.ok) throw new Error(`Gateway returned ${resp.status}`);
+  return resp.json();
+}
+
+function renderTicket(res) {
+  document.getElementById('emptyState').style.display = 'none';
+  const ticket = document.getElementById('ticket');
+  ticket.classList.add('show');
+  document.getElementById('answerText').textContent = res.answer;
+
+  const badgeClass = ROUTE_BADGE_CLASS[res.route] || 'local';
+  const meta = document.getElementById('metaRow');
+  meta.innerHTML = `
+    <span class="badge ${badgeClass}">${res.route}</span>
+    <span><b>${res.modelUsed || '—'}</b></span>
+    <span>${fmtMs(res.latencyMs)}</span>
+    <span>${fmtCost(res.estimatedCostUsd)}</span>
+    ${res.cacheSimilarity != null ? `<span>similarity ${res.cacheSimilarity.toFixed(3)}</span>` : ''}
+    <span title="${res.traceId}">trace ${res.traceId.slice(0, 8)}…</span>
+  `;
+}
+
+function addToHistory(query, res) {
+  history.unshift({ query, route: res.route, cost: res.estimatedCostUsd, latency: res.latencyMs });
+  history = history.slice(0, 10);
+  const el = document.getElementById('historyList');
+  el.innerHTML = history.map(h => `
+    <div class="hist-item">
+      <span class="hist-q">${h.query}</span>
+      <span class="hist-meta">
+        <span class="badge ${ROUTE_BADGE_CLASS[h.route] || 'local'}">${h.route}</span>
+        <span>${fmtMs(h.latency)}</span>
+      </span>
+    </div>
+  `).join('');
+}
+
+async function submitQuery() {
+  const query = document.getElementById('queryInput').value.trim();
+  if (!query) return;
+
+  const btn = document.getElementById('submitBtn');
+  btn.disabled = true;
+  btn.textContent = 'Routing…';
+
+  const compareOn = document.getElementById('compareToggle').checked;
+  const comparePanel = document.getElementById('comparePanel');
+
+  try {
+    const adaptive = await callGateway(query, false);
+    setActiveStop(adaptive.route);
+    renderTicket(adaptive);
+    addToHistory(query, adaptive);
+
+    if (compareOn) {
+      comparePanel.classList.add('show');
+      document.getElementById('adaptiveCost').textContent = fmtCost(adaptive.estimatedCostUsd);
+      document.getElementById('adaptiveLatency').textContent = fmtMs(adaptive.latencyMs);
+      document.getElementById('baselineCost').textContent = '…';
+      document.getElementById('baselineLatency').textContent = '…';
+
+      const baseline = await callGateway(query, true);
+      document.getElementById('baselineCost').textContent = fmtCost(baseline.estimatedCostUsd);
+      document.getElementById('baselineLatency').textContent = fmtMs(baseline.latencyMs);
+    } else {
+      comparePanel.classList.remove('show');
+    }
+
+    loadStats();
+  } catch (err) {
+    document.getElementById('emptyState').style.display = 'none';
+    document.getElementById('ticket').classList.add('show');
+    document.getElementById('answerText').textContent = `Request failed: ${err.message}`;
+    document.getElementById('metaRow').innerHTML = '';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Send →';
+  }
+}
+
+async function loadStats() {
+  try {
+    const resp = await fetch(`${API}/api/stats`);
+    if (!resp.ok) return;
+    const stats = await resp.json();
+
+    document.getElementById('statTotal').textContent = stats.totalRequests;
+    document.getElementById('statCost').textContent = fmtCost(stats.totalCostUsd);
+    document.getElementById('statSaved').textContent = stats.totalRequests > 0
+      ? stats.costSavedPct.toFixed(1) + '%'
+      : '—';
+
+    const barsEl = document.getElementById('routeBars');
+    if (!stats.routes || stats.routes.length === 0) {
+      barsEl.innerHTML = '<p class="empty">No logged requests yet.</p>';
+      return;
+    }
+    const maxCount = Math.max(...stats.routes.map(r => r.count));
+    barsEl.innerHTML = stats.routes
+      .sort((a, b) => b.count - a.count)
+      .map(r => `
+        <div class="bar-row">
+          <span class="name">${r.route}</span>
+          <div class="bar-track"><div class="bar-fill" style="width:${(r.count / maxCount * 100).toFixed(0)}%"></div></div>
+          <span class="count">${r.count}</span>
+        </div>
+      `).join('');
+  } catch (e) { /* stats are best-effort */ }
+}
+
+document.getElementById('submitBtn').addEventListener('click', submitQuery);
+document.getElementById('queryInput').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) submitQuery();
+});
+document.getElementById('refreshStats').addEventListener('click', loadStats);
+
+renderChips();
+loadStats();
+</script>
+</body>
+</html>
+

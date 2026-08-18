@@ -1,0 +1,22 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+  jpa:
+    hibernate:
+      ddl-auto: create-drop   # test-only: fine for H2, still never used against real Postgres
+    database-platform: org.hibernate.dialect.H2Dialect
+
+server:
+  port: 0   # random port for @SpringBootTest(webEnvironment = RANDOM_PORT)
+
+ml-service:
+  url: http://localhost:8000
+ollama:
+  url: http://localhost:11434
+redis:
+  url: redis://localhost:6379
+frontier:
+  api-key: test-key
