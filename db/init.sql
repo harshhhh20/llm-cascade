@@ -8,9 +8,12 @@ CREATE TABLE request_log (
   cache_similarity FLOAT,
   latency_ms INTEGER,
   estimated_cost_usd NUMERIC(10,6),
+  prompt_tokens INTEGER DEFAULT 0,
+  completion_tokens INTEGER DEFAULT 0,
   correctness_score FLOAT,
   created_at TIMESTAMP DEFAULT now()
 );
 
 CREATE INDEX idx_request_log_trace_id ON request_log(trace_id);
 CREATE INDEX idx_request_log_route ON request_log(route);
+

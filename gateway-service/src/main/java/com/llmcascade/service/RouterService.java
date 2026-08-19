@@ -39,53 +39,43 @@ public class RouterService {
     public QueryResponse handle(QueryRequest request, String traceId) {
         long start = System.currentTimeMillis();
 
-        // Eval-only baseline path: skip optimizer/cache/classifier entirely so
-        // the eval harness gets a true "always call frontier" cost/latency
-        // number to compare adaptive routing against.
         if (Boolean.TRUE.equals(request.forceFrontier())) {
-            String answer;
-            try {
-                answer = frontierModel.generate(request.query());
-            } catch (Exception e) {
-                log.error("Baseline frontier model failed: {}", e.getMessage());
-                answer = "The frontier model is currently unavailable.";
-            }
+            GenerationResult result = callFrontier(request, traceId, start, "baseline_frontier");
             return finish(request, traceId, "baseline_frontier", frontierModel.modelIdentifier(),
-                start, frontierModel.costPerRequest(), null, answer);
+                start, frontierModel.computeCost(result), null, result.text(), result.promptTokens(), result.completionTokens());
         }
 
-        // 1. Optimize + injection heuristic check (guardrails.py on the ml-service side)
         PromptOptimizerClient.OptimizedQuery optimized = optimizerClient.optimize(request.query());
         if (optimized.rejected()) {
             return finish(request, traceId, "rejected", null, start, 0.0, null,
-                "This request was flagged and cannot be processed.");
+                "This request was flagged and cannot be processed.", 0, 0);
         }
 
-        // 2. Semantic cache check â€” zero LLM cost on a hit
         try {
             var cacheResult = cacheService.lookup(optimized.text());
             if (cacheResult.isPresent()) {
                 var hit = cacheResult.get();
-                return finish(request, traceId, "cache_hit", null, start, 0.0, hit.similarity(), hit.answer());
+                return finish(request, traceId, "cache_hit", null, start, 0.0, hit.similarity(), hit.answer(), 0, 0);
             }
         } catch (Exception e) {
             log.warn("Cache lookup failed (non-fatal, skipping cache): {}", e.getMessage());
         }
 
-        // 3. Classify complexity
         ClassifierClient.Complexity complexity;
         try {
             complexity = classifierClient.classify(optimized.text());
+            log.info("Classifier routed to {} (score: {}, margin: {}, method: {})", complexity.bucket(), complexity.score(), complexity.margin(), complexity.method());
         } catch (Exception e) {
             log.warn("Classifier failed, defaulting to 'hard' bucket: {}", e.getMessage());
-            complexity = new ClassifierClient.Complexity("hard", 0.0);
+            complexity = new ClassifierClient.Complexity("hard", 0.0, 0.0, "error_fallback");
         }
 
-        // 4 + 5. Route + generate
         String answer;
         String route;
         String modelUsed;
         double cost;
+        int promptTokens = 0;
+        int completionTokens = 0;
 
         if ("trivial".equals(complexity.bucket())) {
             var ruleResult = ruleBasedAnswerService.tryAnswer(optimized.text());
@@ -95,92 +85,93 @@ public class RouterService {
                 modelUsed = null;
                 cost = 0.0;
             } else {
-                // Classifier said trivial but no rule confidently matched â€”
-                // escalate rather than return a placeholder. Logged as its
-                // own route so you can see how often this happens; a high
-                // rate means the classifier's trivial bucket needs tightening.
                 try {
-                    answer = localModel.generate(optimized.text());
+                    GenerationResult result = localModel.generate(optimized.text());
+                    answer = result.text();
                     route = "rule_based_escalated_local";
                     modelUsed = localModel.modelIdentifier();
-                    cost = localModel.costPerRequest();
+                    cost = localModel.computeCost(result);
+                    promptTokens = result.promptTokens();
+                    completionTokens = result.completionTokens();
                 } catch (ModelUnavailableException e) {
                     log.warn("Local model unavailable for escalated trivial, falling back to frontier: {}", e.getMessage());
-                    try {
-                        answer = frontierModel.generate(optimized.text());
-                        route = "rule_based_escalated_frontier";
-                        modelUsed = frontierModel.modelIdentifier();
-                        cost = frontierModel.costPerRequest();
-                    } catch (Exception fe) {
-                        log.error("Frontier model also failed: {}", fe.getMessage());
-                        answer = "Both local and frontier models are unavailable. Please try again later.";
-                        route = "error";
-                        modelUsed = null;
-                        cost = 0.0;
-                    }
+                    GenerationResult result = callFrontier(request, traceId, start, "rule_based_escalated_frontier");
+                    answer = result.text();
+                    route = "rule_based_escalated_frontier";
+                    modelUsed = frontierModel.modelIdentifier();
+                    cost = frontierModel.computeCost(result);
+                    promptTokens = result.promptTokens();
+                    completionTokens = result.completionTokens();
                 }
             }
         } else if ("easy".equals(complexity.bucket())) {
             try {
-                answer = localModel.generate(optimized.text());
+                GenerationResult result = localModel.generate(optimized.text());
+                answer = result.text();
                 route = "local_model";
                 modelUsed = localModel.modelIdentifier();
-                cost = localModel.costPerRequest();
+                cost = localModel.computeCost(result);
+                promptTokens = result.promptTokens();
+                completionTokens = result.completionTokens();
             } catch (ModelUnavailableException e) {
-                // graceful degradation: local model cold/unavailable -> fall back to frontier
                 log.warn("Local model unavailable, falling back to frontier: {}", e.getMessage());
-                try {
-                    answer = frontierModel.generate(optimized.text());
-                    route = "local_model_fallback_frontier";
-                    modelUsed = frontierModel.modelIdentifier();
-                    cost = frontierModel.costPerRequest();
-                } catch (Exception fe) {
-                    log.error("Frontier model also failed: {}", fe.getMessage());
-                    answer = "Both local and frontier models are unavailable. Please try again later.";
-                    route = "error";
-                    modelUsed = null;
-                    cost = 0.0;
-                }
+                GenerationResult result = callFrontier(request, traceId, start, "local_model_fallback_frontier");
+                answer = result.text();
+                route = "local_model_fallback_frontier";
+                modelUsed = frontierModel.modelIdentifier();
+                cost = frontierModel.computeCost(result);
+                promptTokens = result.promptTokens();
+                completionTokens = result.completionTokens();
             }
         } else {
-            try {
-                answer = frontierModel.generate(optimized.text());
-                route = "frontier_model";
-                modelUsed = frontierModel.modelIdentifier();
-                cost = frontierModel.costPerRequest();
-            } catch (Exception e) {
-                log.error("Frontier model failed for hard query: {}", e.getMessage());
-                answer = "The frontier model is currently unavailable. Please check your API key and try again.";
-                route = "error";
-                modelUsed = null;
-                cost = 0.0;
-            }
+            GenerationResult result = callFrontier(request, traceId, start, "frontier_model");
+            answer = result.text();
+            route = "frontier_model";
+            modelUsed = frontierModel.modelIdentifier();
+            cost = frontierModel.computeCost(result);
+            promptTokens = result.promptTokens();
+            completionTokens = result.completionTokens();
         }
 
-        // Don't cache error responses
-        if (!"error".equals(route)) {
-            try {
-                cacheService.store(optimized.text(), answer);
-            } catch (Exception e) {
-                log.warn("Failed to store in cache (non-fatal): {}", e.getMessage());
-            }
+        try {
+            cacheService.store(optimized.text(), answer);
+        } catch (Exception e) {
+            log.warn("Failed to store in cache (non-fatal): {}", e.getMessage());
         }
 
-        return finish(request, traceId, route, modelUsed, start, cost, null, answer);
+        return finish(request, traceId, route, modelUsed, start, cost, null, answer, promptTokens, completionTokens);
+    }
+
+    private GenerationResult callFrontier(QueryRequest request, String traceId, long start, String attemptedRoute) {
+        try {
+            return frontierModel.generate(request.query());
+        } catch (RateLimitedException e) {
+            logFailure(request, traceId, start, "frontier_rate_limited");
+            throw e;
+        } catch (FrontierClientException e) {
+            logFailure(request, traceId, start, "frontier_client_error");
+            throw e;
+        } catch (FrontierUnavailableException e) {
+            logFailure(request, traceId, start, "frontier_unavailable");
+            throw e;
+        }
+    }
+
+    private void logFailure(QueryRequest request, String traceId, long start, String route) {
+        long latency = System.currentTimeMillis() - start;
+        eventPublisher.publishEvent(new RequestLogEvent(
+            UUID.randomUUID(), traceId, request.query(), route, null,
+            false, null, latency, 0.0, 0, 0));
     }
 
     private QueryResponse finish(QueryRequest request, String traceId, String route, String modelUsed,
-                                  long start, double cost, Double similarity, String answer) {
+                                  long start, double cost, Double similarity, String answer, int promptTokens, int completionTokens) {
         long latency = System.currentTimeMillis() - start;
 
-        // Fire-and-forget: publishing this event returns immediately. The actual
-        // Postgres write happens on the "logExecutor" thread pool via @Async,
-        // so it can NEVER add latency to the response below.
         eventPublisher.publishEvent(new RequestLogEvent(
             UUID.randomUUID(), traceId, request.query(), route, modelUsed,
-            similarity != null, similarity, latency, cost));
+            similarity != null, similarity, latency, cost, promptTokens, completionTokens));
 
         return new QueryResponse(answer, route, modelUsed, latency, cost, similarity, traceId);
     }
 }
-

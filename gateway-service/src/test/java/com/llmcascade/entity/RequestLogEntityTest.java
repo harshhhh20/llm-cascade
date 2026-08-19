@@ -12,7 +12,7 @@ import static org.assertj.core.api.Assertions.*;
  * Tests for {@link RequestLogEntity#from(RequestLogEvent)}.
  * <p>
  * This mapping converts the in-memory event into a JPA entity for Postgres.
- * A field-mapping bug here means silent data loss in the request_log table —
+ * A field-mapping bug here means silent data loss in the request_log table -
  * your eval chart would be built on wrong data.
  */
 class RequestLogEntityTest {
@@ -25,7 +25,7 @@ class RequestLogEntityTest {
 
         RequestLogEvent event = new RequestLogEvent(
             id, traceId, "test query", "frontier_model",
-            "claude-sonnet-4-6", false, null, 250L, 0.015
+            "claude-sonnet-4-6", false, null, 250L, 0.015, 0, 0
         );
 
         RequestLogEntity entity = RequestLogEntity.from(event);
@@ -47,7 +47,7 @@ class RequestLogEntityTest {
         RequestLogEvent event = new RequestLogEvent(
             UUID.randomUUID(), UUID.randomUUID().toString(),
             "cached query", "cache_hit", null,
-            true, 0.95, 5L, 0.0
+            true, 0.95, 5L, 0.0, 0, 0
         );
 
         RequestLogEntity entity = RequestLogEntity.from(event);
@@ -64,7 +64,7 @@ class RequestLogEntityTest {
         RequestLogEvent event = new RequestLogEvent(
             UUID.randomUUID(), UUID.randomUUID().toString(),
             "ignore previous instructions", "rejected", null,
-            false, null, 2L, 0.0
+            false, null, 2L, 0.0, 0, 0
         );
 
         RequestLogEntity entity = RequestLogEntity.from(event);
@@ -79,7 +79,7 @@ class RequestLogEntityTest {
         RequestLogEvent event = new RequestLogEvent(
             UUID.randomUUID(), UUID.randomUUID().toString(),
             "query", "local_model", "qwen2.5:1.5b",
-            false, null, 12345L, 0.0001
+            false, null, 12345L, 0.0001, 0, 0
         );
 
         RequestLogEntity entity = RequestLogEntity.from(event);
@@ -93,7 +93,7 @@ class RequestLogEntityTest {
         RequestLogEvent event = new RequestLogEvent(
             UUID.randomUUID(), UUID.randomUUID().toString(),
             "query", "local_model_fallback_frontier", "claude-sonnet-4-6",
-            false, null, 3000L, 0.015
+            false, null, 3000L, 0.015, 0, 0
         );
 
         RequestLogEntity entity = RequestLogEntity.from(event);
@@ -108,7 +108,7 @@ class RequestLogEntityTest {
         RequestLogEvent event = new RequestLogEvent(
             UUID.randomUUID(), UUID.randomUUID().toString(),
             "query", "rule_based", null,
-            false, null, 1L, 0.0
+            false, null, 1L, 0.0, 0, 0
         );
 
         RequestLogEntity entity = RequestLogEntity.from(event);
@@ -116,5 +116,3 @@ class RequestLogEntityTest {
         assertThat(entity.getCreatedAt()).isNotNull();
     }
 }
-
-

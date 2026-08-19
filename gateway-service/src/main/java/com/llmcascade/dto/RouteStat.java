@@ -1,4 +1,10 @@
 package com.llmcascade.dto;
 
-public record RouteStat(String route, long count, double avgLatencyMs, double totalCostUsd) {}
-
+public record RouteStat(
+    String route, 
+    long count, 
+    double avgLatencyMs, 
+    double totalCostUsd,
+    long promptTokens,
+    long completionTokens
+) {}

@@ -11,6 +11,7 @@ public record RequestLogEvent(
     boolean cacheHit,
     Double cacheSimilarity,
     long latencyMs,
-    double estimatedCostUsd
+    double estimatedCostUsd,
+    int promptTokens,
+    int completionTokens
 ) {}
-

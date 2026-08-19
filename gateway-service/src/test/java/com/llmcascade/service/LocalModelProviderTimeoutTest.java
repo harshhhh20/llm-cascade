@@ -60,10 +60,12 @@ class LocalModelProviderTimeoutTest {
         int port = server.getAddress().getPort();
         LocalModelProvider provider = new LocalModelProvider("http://localhost:" + port, 2000);
 
-        String answer = provider.generate("test prompt");
+        GenerationResult answer = provider.generate("test prompt");
 
-        org.assertj.core.api.Assertions.assertThat(answer).isEqualTo("fast answer");
+        org.assertj.core.api.Assertions.assertThat(answer.text()).isEqualTo("fast answer");
     }
 }
+
+
 
 

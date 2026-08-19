@@ -24,6 +24,8 @@ public class RequestLogEntity {
     private Double cacheSimilarity;
     private Integer latencyMs;
     private Double estimatedCostUsd;
+    private Integer promptTokens;
+    private Integer completionTokens;
     private Instant createdAt = Instant.now();
 
     public static RequestLogEntity from(RequestLogEvent event) {
@@ -37,6 +39,8 @@ public class RequestLogEntity {
         e.cacheSimilarity = event.cacheSimilarity();
         e.latencyMs = (int) event.latencyMs();
         e.estimatedCostUsd = event.estimatedCostUsd();
+        e.promptTokens = event.promptTokens();
+        e.completionTokens = event.completionTokens();
         return e;
     }
 
@@ -49,6 +53,7 @@ public class RequestLogEntity {
     public Double getCacheSimilarity() { return cacheSimilarity; }
     public Integer getLatencyMs() { return latencyMs; }
     public Double getEstimatedCostUsd() { return estimatedCostUsd; }
+    public Integer getPromptTokens() { return promptTokens; }
+    public Integer getCompletionTokens() { return completionTokens; }
     public Instant getCreatedAt() { return createdAt; }
 }
-

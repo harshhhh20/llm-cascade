@@ -6,7 +6,8 @@ public record StatsResponse(
     long totalRequests,
     double totalCostUsd,
     double estimatedBaselineCostUsd,
-    double costSavedPct,
+    Double costSavedPct,
+    String costSavedBasis,
+    long totalTokens,
     List<RouteStat> routes
 ) {}
-

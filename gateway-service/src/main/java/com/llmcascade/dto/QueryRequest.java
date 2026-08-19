@@ -1,11 +1,15 @@
 package com.llmcascade.dto;
 
-// forceFrontier: set true by the eval harness only, to get a true
-// "always call the frontier model" baseline for comparison. Bypasses
-// optimizer/cache/classifier entirely â€” never set this from normal traffic.
-public record QueryRequest(String query, String userId, Boolean forceFrontier) {
-    public QueryRequest(String query, String userId) {
-        this(query, userId, false);
-    }
-}
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 
+public record QueryRequest(
+    @NotBlank(message = "query must not be blank")
+    @Size(max = 4000, message = "query must be under 4000 characters")
+    String query,
+
+    String userId,
+
+    // eval-harness only — bypasses optimizer/cache/classifier for baseline comparison
+    Boolean forceFrontier
+) {}

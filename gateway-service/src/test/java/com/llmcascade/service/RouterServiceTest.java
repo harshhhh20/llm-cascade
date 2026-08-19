@@ -189,7 +189,7 @@ class RouterServiceTest {
         @DisplayName("trivial complexity + rule matched → rule_based route, zero cost, no model call")
         void trivialComplexity_usesRuleBased() {
             when(classifierClient.classify("optimized query"))
-                .thenReturn(new ClassifierClient.Complexity("trivial", 0.95));
+                .thenReturn(new ClassifierClient.Complexity("trivial", 0.95, 0.0, "embedding"));
             when(ruleBasedAnswerService.tryAnswer("optimized query"))
                 .thenReturn(new RuleBasedAnswerService.Result(true, "Hello! How can I help you today?"));
 
@@ -206,7 +206,7 @@ class RouterServiceTest {
         @DisplayName("trivial answer still gets cached for future hits")
         void trivialComplexity_storesInCache() {
             when(classifierClient.classify("optimized query"))
-                .thenReturn(new ClassifierClient.Complexity("trivial", 0.95));
+                .thenReturn(new ClassifierClient.Complexity("trivial", 0.95, 0.0, "embedding"));
             when(ruleBasedAnswerService.tryAnswer("optimized query"))
                 .thenReturn(new RuleBasedAnswerService.Result(true, "Hello!"));
 
@@ -221,9 +221,9 @@ class RouterServiceTest {
         @DisplayName("easy complexity → local_model route with qwen2.5:1.5b")
         void easyComplexity_usesLocalModel() {
             when(classifierClient.classify("optimized query"))
-                .thenReturn(new ClassifierClient.Complexity("easy", 0.85));
-            when(localModel.generate("optimized query")).thenReturn("local answer");
-            when(localModel.costPerRequest()).thenReturn(0.0001);
+                .thenReturn(new ClassifierClient.Complexity("easy", 0.85, 0.0, "embedding"));
+            when(localModel.generate("optimized query")).thenReturn(new GenerationResult("local answer", 100, 100));
+            when(localModel.computeCost(org.mockito.ArgumentMatchers.any())).thenReturn(0.0001);
             when(localModel.modelIdentifier()).thenReturn("qwen2.5:1.5b");
 
             QueryResponse response = routerService.handle(SAMPLE_REQUEST, TRACE_ID);
@@ -241,11 +241,11 @@ class RouterServiceTest {
         @DisplayName("easy complexity + local timeout → falls back to frontier with fallback route")
         void easyComplexity_localTimeout_fallsBackToFrontier() {
             when(classifierClient.classify("optimized query"))
-                .thenReturn(new ClassifierClient.Complexity("easy", 0.85));
+                .thenReturn(new ClassifierClient.Complexity("easy", 0.85, 0.0, "embedding"));
             when(localModel.generate("optimized query"))
                 .thenThrow(new ModelUnavailableException("cold start", new RuntimeException()));
-            when(frontierModel.generate("optimized query")).thenReturn("frontier fallback answer");
-            when(frontierModel.costPerRequest()).thenReturn(0.015);
+            when(frontierModel.generate("optimized query")).thenReturn(new GenerationResult("frontier fallback answer", 100, 100));
+            when(frontierModel.computeCost(org.mockito.ArgumentMatchers.any())).thenReturn(0.015);
             when(frontierModel.modelIdentifier()).thenReturn("gemini-3.5-flash-lite");
 
             QueryResponse response = routerService.handle(SAMPLE_REQUEST, TRACE_ID);
@@ -260,11 +260,11 @@ class RouterServiceTest {
         @DisplayName("fallback route is logged separately from regular frontier route")
         void easyComplexity_fallbackRoute_isDistinctInLogs() {
             when(classifierClient.classify("optimized query"))
-                .thenReturn(new ClassifierClient.Complexity("easy", 0.85));
+                .thenReturn(new ClassifierClient.Complexity("easy", 0.85, 0.0, "embedding"));
             when(localModel.generate("optimized query"))
                 .thenThrow(new ModelUnavailableException("cold", new RuntimeException()));
-            when(frontierModel.generate("optimized query")).thenReturn("answer");
-            when(frontierModel.costPerRequest()).thenReturn(0.015);
+            when(frontierModel.generate("optimized query")).thenReturn(new GenerationResult("answer", 100, 100));
+            when(frontierModel.computeCost(org.mockito.ArgumentMatchers.any())).thenReturn(0.015);
 
             routerService.handle(SAMPLE_REQUEST, TRACE_ID);
 
@@ -282,9 +282,9 @@ class RouterServiceTest {
         @DisplayName("hard complexity → frontier_model route")
         void hardComplexity_usesFrontierModel() {
             when(classifierClient.classify("optimized query"))
-                .thenReturn(new ClassifierClient.Complexity("hard", 0.90));
-            when(frontierModel.generate("optimized query")).thenReturn("frontier answer");
-            when(frontierModel.costPerRequest()).thenReturn(0.015);
+                .thenReturn(new ClassifierClient.Complexity("hard", 0.90, 0.0, "embedding"));
+            when(frontierModel.generate("optimized query")).thenReturn(new GenerationResult("frontier answer", 100, 100));
+            when(frontierModel.computeCost(org.mockito.ArgumentMatchers.any())).thenReturn(0.015);
             when(frontierModel.modelIdentifier()).thenReturn("gemini-3.5-flash-lite");
 
             QueryResponse response = routerService.handle(SAMPLE_REQUEST, TRACE_ID);
@@ -302,9 +302,9 @@ class RouterServiceTest {
         @DisplayName("unknown complexity bucket defaults to frontier (fail-safe)")
         void unknownBucket_defaultsToFrontier() {
             when(classifierClient.classify("optimized query"))
-                .thenReturn(new ClassifierClient.Complexity("unknown_bucket", 0.5));
-            when(frontierModel.generate("optimized query")).thenReturn("frontier answer");
-            when(frontierModel.costPerRequest()).thenReturn(0.015);
+                .thenReturn(new ClassifierClient.Complexity("unknown_bucket", 0.5, 0.0, "embedding"));
+            when(frontierModel.generate("optimized query")).thenReturn(new GenerationResult("frontier answer", 100, 100));
+            when(frontierModel.computeCost(org.mockito.ArgumentMatchers.any())).thenReturn(0.015);
             when(frontierModel.modelIdentifier()).thenReturn("gemini-3.5-flash-lite");
 
             QueryResponse response = routerService.handle(SAMPLE_REQUEST, TRACE_ID);
@@ -330,9 +330,9 @@ class RouterServiceTest {
                 .thenReturn(new PromptOptimizerClient.OptimizedQuery("q", false));
             when(cacheService.lookup(anyString())).thenReturn(Optional.empty());
             when(classifierClient.classify(anyString()))
-                .thenReturn(new ClassifierClient.Complexity("hard", 0.9));
-            when(frontierModel.generate(anyString())).thenReturn("answer");
-            when(frontierModel.costPerRequest()).thenReturn(0.015);
+                .thenReturn(new ClassifierClient.Complexity("hard", 0.9, 0.0, "embedding"));
+            when(frontierModel.generate(anyString())).thenReturn(new GenerationResult("answer", 100, 100));
+            when(frontierModel.computeCost(org.mockito.ArgumentMatchers.any())).thenReturn(0.015);
 
             routerService.handle(SAMPLE_REQUEST, TRACE_ID);
 
@@ -345,7 +345,7 @@ class RouterServiceTest {
             when(optimizerClient.optimize(anyString()))
                 .thenReturn(new PromptOptimizerClient.OptimizedQuery("q", false));
             when(cacheService.lookup(anyString())).thenReturn(Optional.empty());
-            when(classifierClient.classify(anyString())).thenReturn(new ClassifierClient.Complexity("hard", 0.9));
+            when(classifierClient.classify(anyString())).thenReturn(new ClassifierClient.Complexity("hard", 0.9, 0.0, "embedding"));
 
             routerService.handle(SAMPLE_REQUEST, TRACE_ID);
 
@@ -361,7 +361,7 @@ class RouterServiceTest {
             when(optimizerClient.optimize(anyString()))
                 .thenReturn(new PromptOptimizerClient.OptimizedQuery("optimized", false));
             when(cacheService.lookup(anyString())).thenReturn(Optional.empty());
-            when(classifierClient.classify(anyString())).thenReturn(new ClassifierClient.Complexity("hard", 0.9));
+            when(classifierClient.classify(anyString())).thenReturn(new ClassifierClient.Complexity("hard", 0.9, 0.0, "embedding"));
 
             routerService.handle(SAMPLE_REQUEST, TRACE_ID);
 
@@ -379,7 +379,7 @@ class RouterServiceTest {
             when(optimizerClient.optimize(anyString()))
                 .thenReturn(new PromptOptimizerClient.OptimizedQuery("q", false));
             when(cacheService.lookup(anyString())).thenReturn(Optional.empty());
-            when(classifierClient.classify(anyString())).thenReturn(new ClassifierClient.Complexity("hard", 0.9));
+            when(classifierClient.classify(anyString())).thenReturn(new ClassifierClient.Complexity("hard", 0.9, 0.0, "embedding"));
 
             routerService.handle(SAMPLE_REQUEST, TRACE_ID);
 
@@ -395,9 +395,9 @@ class RouterServiceTest {
                 .thenReturn(new PromptOptimizerClient.OptimizedQuery("q", false));
             when(cacheService.lookup(anyString())).thenReturn(Optional.empty());
             when(classifierClient.classify(anyString()))
-                .thenReturn(new ClassifierClient.Complexity("hard", 0.9));
-            when(frontierModel.generate(anyString())).thenReturn("answer");
-            when(frontierModel.costPerRequest()).thenReturn(0.015);
+                .thenReturn(new ClassifierClient.Complexity("hard", 0.9, 0.0, "embedding"));
+            when(frontierModel.generate(anyString())).thenReturn(new GenerationResult("answer", 100, 100));
+            when(frontierModel.computeCost(org.mockito.ArgumentMatchers.any())).thenReturn(0.015);
 
             routerService.handle(SAMPLE_REQUEST, TRACE_ID);
 
@@ -434,7 +434,7 @@ class RouterServiceTest {
             when(optimizerClient.optimize(anyString()))
                 .thenReturn(new PromptOptimizerClient.OptimizedQuery("q", false));
             when(cacheService.lookup(anyString())).thenReturn(Optional.empty());
-            when(classifierClient.classify(anyString())).thenReturn(new ClassifierClient.Complexity("hard", 0.9));
+            when(classifierClient.classify(anyString())).thenReturn(new ClassifierClient.Complexity("hard", 0.9, 0.0, "embedding"));
             
 
             QueryResponse response = routerService.handle(SAMPLE_REQUEST, TRACE_ID);
@@ -449,9 +449,9 @@ class RouterServiceTest {
                 .thenReturn(new PromptOptimizerClient.OptimizedQuery("q", false));
             when(cacheService.lookup(anyString())).thenReturn(Optional.empty());
             when(classifierClient.classify(anyString()))
-                .thenReturn(new ClassifierClient.Complexity("hard", 0.9));
-            when(frontierModel.generate(anyString())).thenReturn("answer");
-            when(frontierModel.costPerRequest()).thenReturn(0.015);
+                .thenReturn(new ClassifierClient.Complexity("hard", 0.9, 0.0, "embedding"));
+            when(frontierModel.generate(anyString())).thenReturn(new GenerationResult("answer", 100, 100));
+            when(frontierModel.computeCost(org.mockito.ArgumentMatchers.any())).thenReturn(0.015);
 
             QueryResponse response = routerService.handle(SAMPLE_REQUEST, TRACE_ID);
 
@@ -478,9 +478,9 @@ class RouterServiceTest {
         @DisplayName("non-cached answers get stored in cache for future hits")
         void cacheMiss_storesResult() {
             when(classifierClient.classify("optimized"))
-                .thenReturn(new ClassifierClient.Complexity("hard", 0.9));
-            when(frontierModel.generate("optimized")).thenReturn("frontier answer");
-            when(frontierModel.costPerRequest()).thenReturn(0.015);
+                .thenReturn(new ClassifierClient.Complexity("hard", 0.9, 0.0, "embedding"));
+            when(frontierModel.generate("optimized")).thenReturn(new GenerationResult("frontier answer", 100, 100));
+            when(frontierModel.computeCost(org.mockito.ArgumentMatchers.any())).thenReturn(0.015);
 
             routerService.handle(SAMPLE_REQUEST, TRACE_ID);
 
@@ -491,11 +491,11 @@ class RouterServiceTest {
         @DisplayName("fallback answers also get cached")
         void fallbackAnswer_alsoGetsCached() {
             when(classifierClient.classify("optimized"))
-                .thenReturn(new ClassifierClient.Complexity("easy", 0.85));
+                .thenReturn(new ClassifierClient.Complexity("easy", 0.85, 0.0, "embedding"));
             when(localModel.generate("optimized"))
                 .thenThrow(new ModelUnavailableException("cold", new RuntimeException()));
-            when(frontierModel.generate("optimized")).thenReturn("fallback answer");
-            when(frontierModel.costPerRequest()).thenReturn(0.015);
+            when(frontierModel.generate("optimized")).thenReturn(new GenerationResult("fallback answer", 100, 100));
+            when(frontierModel.computeCost(org.mockito.ArgumentMatchers.any())).thenReturn(0.015);
 
             routerService.handle(SAMPLE_REQUEST, TRACE_ID);
 
@@ -506,7 +506,7 @@ class RouterServiceTest {
         @DisplayName("cache stores the optimized query, not the raw one")
         void cacheStore_usesOptimizedQuery() {
             when(classifierClient.classify("optimized"))
-                .thenReturn(new ClassifierClient.Complexity("trivial", 0.9));
+                .thenReturn(new ClassifierClient.Complexity("trivial", 0.9, 0.0, "embedding"));
             when(ruleBasedAnswerService.tryAnswer("optimized"))
                 .thenReturn(new RuleBasedAnswerService.Result(true, "mocked answer"));
 
@@ -549,7 +549,7 @@ class RouterServiceTest {
                 .thenReturn(new PromptOptimizerClient.OptimizedQuery("cleaned query", false));
             when(cacheService.lookup("cleaned query")).thenReturn(Optional.empty());
             when(classifierClient.classify("cleaned query"))
-                .thenReturn(new ClassifierClient.Complexity("trivial", 0.9));
+                .thenReturn(new ClassifierClient.Complexity("trivial", 0.9, 0.0, "embedding"));
             when(ruleBasedAnswerService.tryAnswer("cleaned query"))
                 .thenReturn(new RuleBasedAnswerService.Result(true, "mocked answer"));
 
@@ -559,6 +559,12 @@ class RouterServiceTest {
         }
     }
 }
+
+
+
+
+
+
 
 
 

@@ -1,19 +1,22 @@
+import os
+
 from fastapi import FastAPI
 from pydantic import BaseModel
 from sentence_transformers import SentenceTransformer
 import numpy as np
+import requests
 
 from guardrails import is_suspicious
 
 app = FastAPI(title="LLM Gateway ML Service")
 
-# Loaded once at process startup — reloading per request would defeat the
-# entire point of a "cheap tier".
 embedder = SentenceTransformer("all-MiniLM-L6-v2")
 
-# Tiny seed set for nearest-neighbor complexity classification.
-# Replace/expand with real labeled examples once you're logging real queries —
-# this is intentionally a v1, not a trained model (see project spec Section 4.3).
+OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://ollama:11434")
+LOCAL_MODEL_NAME = os.environ.get("LOCAL_MODEL_NAME", "qwen2.5:1.5b")
+
+CONFIDENCE_MARGIN_THRESHOLD = 0.08
+
 SEED_EXAMPLES = {
     "trivial": [
         "hi", "what is 2+2", "what time is it", "hello there", "good morning",
@@ -29,6 +32,7 @@ SEED_EXAMPLES = {
         "testing 123", "who are you?", "what is 0+0", "is 10<20?",
     ],
     "easy": [
+        "explain what a hash map is", "how do linked lists work", "what is a binary tree",
         "summarize this paragraph", "what is the capital of france", "convert 10 miles to km", "explain what a variable is",
         "translate hello to spanish", "what is the tallest mountain", "define photosynthesis", "how many cups in a quart",
         "who wrote romeo and juliet", "what is the speed of light", "convert 32 fahrenheit to celsius", "summarize the plot of the matrix",
@@ -100,55 +104,83 @@ _seed_embeddings = {
     bucket: embedder.encode(examples) for bucket, examples in SEED_EXAMPLES.items()
 }
 
-
 class OptimizeRequest(BaseModel):
     raw_query: str
-
 
 class EmbedRequest(BaseModel):
     text: str
 
-
 class ClassifyRequest(BaseModel):
     text: str
-
 
 def cosine_sim(a, b) -> float:
     return float(np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b)))
 
+def llm_tiebreak(query: str) -> str | None:
+    prompt = (
+        "Classify the difficulty of the following question as exactly one word: "
+        "trivial, easy, or hard.\n"
+        "trivial = a greeting, small talk, or basic arithmetic.\n"
+        "easy = a single well-known fact, definition, or concept, answerable in one or two sentences.\n"
+        "hard = requires multi-step reasoning, system design, a proof, or deep technical explanation.\n\n"
+        f"Question: {query}\n"
+        "Answer with exactly one word: trivial, easy, or hard."
+    )
+    try:
+        resp = requests.post(
+            f"{OLLAMA_URL}/api/generate",
+            json={"model": LOCAL_MODEL_NAME, "prompt": prompt, "stream": False, "keep_alive": "10m"},
+            timeout=15,
+        )
+        resp.raise_for_status()
+        text = resp.json().get("response", "").strip().lower()
+        for bucket in ("trivial", "easy", "hard"):
+            if bucket in text:
+                return bucket
+    except Exception:
+        pass
+    return None
 
 @app.post("/optimize")
 def optimize(req: OptimizeRequest):
     if is_suspicious(req.raw_query):
         return {"optimized_query": "", "rejected": True}
 
-    # v1: light rule-based cleanup. Swap in a cheap LLM rewrite call later if needed.
     cleaned = " ".join(req.raw_query.strip().split())
     for filler in ["um, ", "like, ", "you know, ", "please "]:
         cleaned = cleaned.replace(filler, "")
 
     return {"optimized_query": cleaned, "rejected": False}
 
-
 @app.post("/embed")
 def embed(req: EmbedRequest):
     vector = embedder.encode(req.text)
     return {"embedding": vector.tolist()}
 
-
 @app.post("/classify")
 def classify(req: ClassifyRequest):
     query_embedding = embedder.encode(req.text)
 
-    best_bucket, best_score = "hard", -1.0  # default to the safe/expensive tier
+    scores = {}
     for bucket, embeddings in _seed_embeddings.items():
         sims = [cosine_sim(query_embedding, e) for e in embeddings]
-        max_sim = max(sims)
-        if max_sim > best_score:
-            best_bucket, best_score = bucket, max_sim
+        scores[bucket] = max(sims)
 
-    return {"complexity": best_bucket, "score": best_score}
+    ranked = sorted(scores.items(), key=lambda kv: kv[1], reverse=True)
+    top_bucket, top_score = ranked[0]
+    second_score = ranked[1][1]
+    margin = top_score - second_score
 
+    final_bucket = top_bucket
+    method = "embedding"
+
+    if margin < CONFIDENCE_MARGIN_THRESHOLD:
+        tiebreak = llm_tiebreak(req.text)
+        if tiebreak is not None:
+            final_bucket = tiebreak
+            method = "llm_tiebreak"
+
+    return {"complexity": final_bucket, "score": top_score, "margin": margin, "method": method}
 
 @app.get("/health")
 def health():

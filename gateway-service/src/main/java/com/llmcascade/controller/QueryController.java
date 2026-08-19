@@ -5,6 +5,7 @@ import com.llmcascade.dto.QueryResponse;
 import com.llmcascade.filter.TraceIdFilter;
 import com.llmcascade.service.RouterService;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -18,9 +19,8 @@ public class QueryController {
     }
 
     @PostMapping("/query")
-    public QueryResponse query(@RequestBody QueryRequest request, HttpServletRequest httpRequest) {
+    public QueryResponse query(@Valid @RequestBody QueryRequest request, HttpServletRequest httpRequest) {
         String traceId = (String) httpRequest.getAttribute(TraceIdFilter.TRACE_ID_ATTR);
         return routerService.handle(request, traceId);
     }
 }
-

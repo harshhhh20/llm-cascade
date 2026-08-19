@@ -8,7 +8,7 @@ spring:
     password: ${SPRING_DATASOURCE_PASSWORD:gateway}
   jpa:
     hibernate:
-      ddl-auto: none   # schema comes from db/init.sql â€” never let Hibernate own prod schema
+      ddl-auto: none   # schema comes from db/init.sql — never let Hibernate own prod schema
     show-sql: false
 
 ml-services:
@@ -22,6 +22,8 @@ redis:
 
 frontier:
   api-key: ${FRONTIER_API_KEY:}
+  prompt-price-per-million-tokens: 1.25
+  completion-price-per-million-tokens: 5.00
 
 management:
   endpoints:
@@ -29,4 +31,24 @@ management:
       exposure:
         include: health,metrics
 
+resilience4j:
+  retry:
+    instances:
+      frontier:
+        max-attempts: 3
+        wait-duration: 500ms
+        exponential-backoff-multiplier: 2   # 500ms, 1s, 2s between attempts
+        retry-exceptions:
+          - com.llmcascade.service.RateLimitedException
+          - com.llmcascade.service.FrontierUnavailableException
+        ignore-exceptions:
+          - com.llmcascade.service.FrontierClientException   # bad request/auth — retrying can't fix this
+  circuitbreaker:
+    instances:
+      frontier:
+        sliding-window-size: 20              # evaluate failure rate over the last 20 calls
+        minimum-number-of-calls: 10          # don't trip on a tiny sample right after startup
+        failure-rate-threshold: 50           # open the circuit if >=50% of recent calls failed
+        wait-duration-in-open-state: 30s     # how long to fail fast before trying again
+        permitted-number-of-calls-in-half-open-state: 3
 

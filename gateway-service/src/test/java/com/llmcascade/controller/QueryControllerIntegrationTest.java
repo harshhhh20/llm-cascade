@@ -58,10 +58,10 @@ class QueryControllerIntegrationTest {
             .thenReturn(new OptimizedQuery("what is 15 percent of 200", false));
         when(cacheService.lookup(anyString())).thenReturn(Optional.empty());
         when(classifierClient.classify(anyString()))
-            .thenReturn(new Complexity("easy", 0.85));
-        when(localModel.generate(anyString())).thenReturn("30");
+            .thenReturn(new Complexity("easy", 0.85, 0.0, "embedding"));
+        when(localModel.generate(anyString())).thenReturn(new GenerationResult("30", 100, 100));
         when(localModel.modelIdentifier()).thenReturn("qwen2.5:1.5b");
-        when(localModel.costPerRequest()).thenReturn(0.0001);
+        when(localModel.computeCost(org.mockito.ArgumentMatchers.any())).thenReturn(0.0001);
 
         mockMvc.perform(post("/api/query")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -131,10 +131,10 @@ class QueryControllerIntegrationTest {
             .thenReturn(new OptimizedQuery("design a cache eviction strategy", false));
         when(cacheService.lookup(anyString())).thenReturn(Optional.empty());
         when(classifierClient.classify(anyString()))
-            .thenReturn(new Complexity("hard", 0.92));
-        when(frontierModel.generate(anyString())).thenReturn("Use LRU with TTL...");
+            .thenReturn(new Complexity("hard", 0.92, 0.0, "embedding"));
+        when(frontierModel.generate(anyString())).thenReturn(new GenerationResult("Use LRU with TTL...", 100, 100));
         when(frontierModel.modelIdentifier()).thenReturn("claude-sonnet-4-6");
-        when(frontierModel.costPerRequest()).thenReturn(0.015);
+        when(frontierModel.computeCost(org.mockito.ArgumentMatchers.any())).thenReturn(0.015);
         when(frontierModel.modelIdentifier()).thenReturn("claude-sonnet-4-6");
 
         mockMvc.perform(post("/api/query")
@@ -155,12 +155,12 @@ class QueryControllerIntegrationTest {
             .thenReturn(new OptimizedQuery("explain variables", false));
         when(cacheService.lookup(anyString())).thenReturn(Optional.empty());
         when(classifierClient.classify(anyString()))
-            .thenReturn(new Complexity("easy", 0.85));
+            .thenReturn(new Complexity("easy", 0.85, 0.0, "embedding"));
         when(localModel.generate(anyString()))
             .thenThrow(new ModelUnavailableException("cold", new RuntimeException()));
-        when(frontierModel.generate(anyString())).thenReturn("A variable is...");
+        when(frontierModel.generate(anyString())).thenReturn(new GenerationResult("A variable is...", 100, 100));
         when(frontierModel.modelIdentifier()).thenReturn("claude-sonnet-4-6");
-        when(frontierModel.costPerRequest()).thenReturn(0.015);
+        when(frontierModel.computeCost(org.mockito.ArgumentMatchers.any())).thenReturn(0.015);
         when(frontierModel.modelIdentifier()).thenReturn("claude-sonnet-4-6");
 
         mockMvc.perform(post("/api/query")
@@ -180,7 +180,7 @@ class QueryControllerIntegrationTest {
             .thenReturn(new OptimizedQuery("hello", false));
         when(cacheService.lookup(anyString())).thenReturn(Optional.empty());
         when(classifierClient.classify(anyString()))
-            .thenReturn(new Complexity("trivial", 0.98));
+            .thenReturn(new Complexity("trivial", 0.98, 0.0, "embedding"));
 
         mockMvc.perform(post("/api/query")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -194,6 +194,12 @@ class QueryControllerIntegrationTest {
             .andExpect(jsonPath("$.answer").value("Hello! How can I help you today?"));
     }
 }
+
+
+
+
+
+
 
 
 

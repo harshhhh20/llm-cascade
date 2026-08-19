@@ -3,9 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Gateway Console — Intelligent LLM Cascade</title>
+<title>Gateway Console — Intelligent LLM Gateway</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
 <style>
   :root {
     --bg: #10151F;
@@ -133,7 +134,19 @@
   /* Response ticket */
   .ticket { display: none; }
   .ticket.show { display: block; }
-  .answer { font-size: 15px; line-height: 1.6; margin: 0 0 16px; white-space: pre-wrap; }
+  .answer { font-size: 15px; line-height: 1.65; margin: 0 0 16px; }
+  .answer h1, .answer h2, .answer h3 { font-family: var(--sans); font-weight: 700; margin: 18px 0 8px; color: var(--text); }
+  .answer h1 { font-size: 19px; }
+  .answer h2 { font-size: 17px; }
+  .answer h3 { font-size: 15px; color: var(--amber); }
+  .answer p { margin: 0 0 12px; }
+  .answer ul, .answer ol { margin: 0 0 12px; padding-left: 22px; }
+  .answer li { margin-bottom: 4px; }
+  .answer strong { color: var(--text); font-weight: 700; }
+  .answer code { font-family: var(--mono); font-size: 13px; background: var(--surface-2); padding: 2px 5px; border-radius: 4px; color: var(--amber); }
+  .answer pre { background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; padding: 12px; overflow-x: auto; margin: 0 0 12px; }
+  .answer pre code { background: none; padding: 0; color: var(--text); }
+  .answer a { color: var(--blue); }
   .meta { display: flex; flex-wrap: wrap; gap: 10px 22px; font-family: var(--mono); font-size: 12px; color: var(--text-muted); border-top: 1px dashed var(--border); padding-top: 14px; }
   .meta b { color: var(--text); font-weight: 600; }
   .badge {
@@ -191,7 +204,7 @@
 <div class="wrap">
 
   <header>
-    <p class="eyebrow">Intelligent LLM Cascade</p>
+    <p class="eyebrow">Intelligent LLM Gateway</p>
     <h1>Gateway Console</h1>
     <p class="sub">Every query below is routed live — cached, rule-based, local model, or frontier API — based on measured complexity, not a fixed path. Watch where it lands.</p>
   </header>
@@ -248,8 +261,8 @@
     </div>
     <div class="stats-grid">
       <div class="stat-box"><div class="label">Total requests</div><div class="value" id="statTotal">—</div></div>
-      <div class="stat-box"><div class="label">Total cost</div><div class="value" id="statCost">—</div></div>
-      <div class="stat-box"><div class="label">Cost saved</div><div class="value saved" id="statSaved">—</div></div>
+      <div class="stat-box"><div class="label">Total tokens</div><div class="value" id="statTokens">-</div></div><div class="stat-box"><div class="label">Total cost</div><div class="value" id="statCost">-</div></div>
+      <div class="stat-box"><div class="label">Cost saved</div><div class="value saved" id="statSaved">�</div> <div style="font-family: var(--mono); font-size: 10px; color: var(--text-muted); margin-top: 4px;" id="statSavedBasis"></div></div>
     </div>
     <div id="routeBars"><p class="empty">No logged requests yet.</p></div>
   </div>
@@ -332,7 +345,7 @@ function renderTicket(res) {
   document.getElementById('emptyState').style.display = 'none';
   const ticket = document.getElementById('ticket');
   ticket.classList.add('show');
-  document.getElementById('answerText').textContent = res.answer;
+  document.getElementById('answerText').innerHTML = marked.parse(res.answer);
 
   const badgeClass = ROUTE_BADGE_CLASS[res.route] || 'local';
   const meta = document.getElementById('metaRow');
@@ -396,7 +409,7 @@ async function submitQuery() {
   } catch (err) {
     document.getElementById('emptyState').style.display = 'none';
     document.getElementById('ticket').classList.add('show');
-    document.getElementById('answerText').textContent = `Request failed: ${err.message}`;
+    document.getElementById('answerText').innerHTML = `Request failed: ${err.message}`;
     document.getElementById('metaRow').innerHTML = '';
   } finally {
     btn.disabled = false;
@@ -411,10 +424,8 @@ async function loadStats() {
     const stats = await resp.json();
 
     document.getElementById('statTotal').textContent = stats.totalRequests;
-    document.getElementById('statCost').textContent = fmtCost(stats.totalCostUsd);
-    document.getElementById('statSaved').textContent = stats.totalRequests > 0
-      ? stats.costSavedPct.toFixed(1) + '%'
-      : '—';
+    document.getElementById('statTokens').textContent = stats.totalTokens ? stats.totalTokens.toLocaleString() : '0'; document.getElementById('statCost').textContent = fmtCost(stats.totalCostUsd);
+    document.getElementById('statSaved').textContent = stats.costSavedPct != null ? stats.costSavedPct.toFixed(1) + '%' : 'N/A'; document.getElementById('statSavedBasis').textContent = stats.costSavedBasis === 'estimated_no_frontier_data_yet' ? '(estimated � no real frontier calls yet)' : stats.costSavedBasis.startsWith('measured') ? `(measured from ${stats.costSavedBasis.split('_')[2]} real calls)` : '';
 
     const barsEl = document.getElementById('routeBars');
     if (!stats.routes || stats.routes.length === 0) {
@@ -445,4 +456,6 @@ loadStats();
 </script>
 </body>
 </html>
+
+
 

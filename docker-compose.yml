@@ -1,6 +1,7 @@
+version: '3.8'
 services:
   redis:
-    image: redis/redis-stack:latest   # includes RediSearch â€” plain redis:alpine has NO vector search
+    image: redis/redis-stack:latest   # includes RediSearch — plain redis:alpine has NO vector search
     ports:
       - "6379:6379"
       - "8001:8001"   # RedisInsight UI, handy for debugging the cache
@@ -22,7 +23,6 @@ services:
       - "11434:11434"
     volumes:
       - ollama-data:/root/.ollama
-    # after first `docker compose up`, run: docker exec -it <ollama-container> ollama pull phi3:mini
 
   ml-services:
     build: ./ml-services
@@ -30,13 +30,17 @@ services:
       - "8000:8000"
     depends_on:
       - redis
+      - ollama
+    environment:
+      OLLAMA_URL: http://ollama:11434
+      LOCAL_MODEL_NAME: qwen2.5:1.5b
     volumes:
       - ./eval:/app/eval
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
       interval: 5s
       timeout: 5s
-      retries: 30        # up to 2.5 minutes for first-time model loading
+      retries: 30
       start_period: 10s
 
   gateway-service:
@@ -49,7 +53,7 @@ services:
       postgres:
         condition: service_started
       ml-services:
-        condition: service_healthy   # wait until /health returns 200
+        condition: service_healthy
       ollama:
         condition: service_started
     environment:
@@ -63,5 +67,3 @@ services:
 
 volumes:
   ollama-data:
-
-
