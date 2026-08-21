@@ -51,7 +51,7 @@ public class FrontierModelProvider implements ModelProvider {
             ))
         );
 
-        String url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=" + apiKey;
+        String url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key=" + apiKey;
 
         try {
             HttpEntity<Map<String, Object>> entity = new HttpEntity<>(body, headers);
@@ -97,7 +97,7 @@ public class FrontierModelProvider implements ModelProvider {
     public String tierName() { return "frontier_model"; }
 
     @Override
-    public String modelIdentifier() { return "gemini-1.5-pro"; }
+    public String modelIdentifier() { return "gemini-3.5-flash-lite"; }
 
     @Override
     public double estimateCostPerRequest() {

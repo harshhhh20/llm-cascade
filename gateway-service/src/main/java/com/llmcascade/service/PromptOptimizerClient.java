@@ -9,10 +9,14 @@ import java.util.Map;
 @Component
 public class PromptOptimizerClient {
 
-    private final RestTemplate restTemplate = new RestTemplate();
+    private final RestTemplate restTemplate;
     private final String mlServiceUrl;
 
-    public PromptOptimizerClient(@Value("${ml-service.url}") String mlServiceUrl) {
+    public PromptOptimizerClient(@Value("${ml-services.url}") String mlServiceUrl) {
+        org.springframework.http.client.SimpleClientHttpRequestFactory factory = new org.springframework.http.client.SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(5000);
+        factory.setReadTimeout(10000);
+        this.restTemplate = new RestTemplate(factory);
         this.mlServiceUrl = mlServiceUrl;
     }
 
@@ -25,4 +29,5 @@ public class PromptOptimizerClient {
         return new OptimizedQuery((String) response.get("optimized_query"), rejected);
     }
 }
+
 

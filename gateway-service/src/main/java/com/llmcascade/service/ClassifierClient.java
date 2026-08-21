@@ -9,10 +9,14 @@ import java.util.Map;
 @Component
 public class ClassifierClient {
 
-    private final RestTemplate restTemplate = new RestTemplate();
+    private final RestTemplate restTemplate;
     private final String mlServiceUrl;
 
     public ClassifierClient(@Value("${ml-services.url}") String mlServiceUrl) {
+        org.springframework.http.client.SimpleClientHttpRequestFactory factory = new org.springframework.http.client.SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(5000);
+        factory.setReadTimeout(15000);
+        this.restTemplate = new RestTemplate(factory);
         this.mlServiceUrl = mlServiceUrl;
     }
 
@@ -28,3 +32,4 @@ public class ClassifierClient {
             (String) response.get("method"));
     }
 }
+

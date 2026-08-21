@@ -10,10 +10,14 @@ import java.util.Map;
 @Component
 public class EmbeddingClient {
 
-    private final RestTemplate restTemplate = new RestTemplate();
+    private final RestTemplate restTemplate;
     private final String mlServiceUrl;
 
-    public EmbeddingClient(@Value("${ml-service.url}") String mlServiceUrl) {
+    public EmbeddingClient(@Value("${ml-services.url}") String mlServiceUrl) {
+        org.springframework.http.client.SimpleClientHttpRequestFactory factory = new org.springframework.http.client.SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(5000);
+        factory.setReadTimeout(10000);
+        this.restTemplate = new RestTemplate(factory);
         this.mlServiceUrl = mlServiceUrl;
     }
 
@@ -27,4 +31,5 @@ public class EmbeddingClient {
         return result;
     }
 }
+
 
